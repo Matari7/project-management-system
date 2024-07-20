@@ -1,0 +1,66 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:13
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: project_management
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+  dynamodb:
+    image: amazon/dynamodb-local
+    ports:
+      - "8000:8000"
+    command: "-jar DynamoDBLocal.jar -sharedDb"
+
+  project-management-microservice:
+    build:
+      context: ./project-management-microservice
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: postgres://user:password@postgres:5432/project_management
+    depends_on:
+      - postgres
+
+  notifications-microservice:
+    build:
+      context: ./notifications-microservice
+    ports:
+      - "3001:3001"
+    environment:
+      DYNAMODB_ENDPOINT: http://dynamodb:8000
+      AWS_ACCESS_KEY_ID: dummy
+      AWS_SECRET_ACCESS_KEY: dummy
+    depends_on:
+      - dynamodb
+
+  security-microservice:
+    build:
+      context: ./security-microservice
+    ports:
+      - "3002:3002"
+    environment:
+      DYNAMODB_ENDPOINT: http://dynamodb:8000
+      AWS_ACCESS_KEY_ID: dummy
+      AWS_SECRET_ACCESS_KEY: dummy
+    depends_on:
+      - dynamodb
+
+  frontend:
+    build:
+      context: ./frontend
+    ports:
+      - "3003:3000"
+    depends_on:
+      - project-management-microservice
+      - notifications-microservice
+      - security-microservice
+
+volumes:
+  postgres-data:
